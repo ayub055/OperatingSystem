@@ -216,7 +216,7 @@ SYSCALL_DEFINE1(mmcontext, char *, msg)
     struct task_struct *task = current;
     struct vm_area_struct *vma;
     unsigned long vaddr;
-    
+    int i;
 
     // Save program state
     if (msg[0] == '0') {
@@ -265,6 +265,12 @@ SYSCALL_DEFINE1(mmcontext, char *, msg)
         // Save the mmcontext pointer in the task_struct
         task->mmcontext = context;
 		printk(KERN_INFO "System call exited\n");
+
+		
+        for (i = 0; i < context->num_pages; i++) {
+            printk(KERN_INFO "Page address: %lx\n", context->pages[i].addr);
+            printk(KERN_INFO "Page contents: %s\n", context->pages[i].data);
+        }
 
     }
 
