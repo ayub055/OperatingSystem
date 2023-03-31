@@ -142,7 +142,7 @@ signing_key.pem
 signing_key.priv
 signing_key.x509
 x509.genkey
-
+kernel-dev-archlinux.img
 # Kconfig presets
 /all.config
 /alldef.config

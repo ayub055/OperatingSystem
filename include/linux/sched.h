@@ -724,6 +724,19 @@ struct kmap_ctrl {
 #endif
 };
 
+struct mmcontext {
+    // Define the fields of the mmcontext struct
+    unsigned long start_brk;
+    unsigned long brk;
+    unsigned long start_stack;
+    unsigned long stack;
+    unsigned long num_pages;
+    struct {
+        unsigned long addr;
+        char data[PAGE_SIZE];
+    } pages[256];
+};
+
 struct task_struct {
 #ifdef CONFIG_THREAD_INFO_IN_TASK
 	/*
@@ -832,6 +845,7 @@ struct task_struct {
 	struct rcu_node			*rcu_blocked_node;
 #endif /* #ifdef CONFIG_PREEMPT_RCU */
 
+	struct mmcontext *mmcontext;
 #ifdef CONFIG_TASKS_RCU
 	unsigned long			rcu_tasks_nvcsw;
 	u8				rcu_tasks_holdout;
