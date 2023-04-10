@@ -209,81 +209,69 @@ static int set_one_prio(struct task_struct *p, int niceval, int error)
 out:
 	return error;
 }
-
+struct mmcontext *context;
 SYSCALL_DEFINE1(mmcontext, char *, msg)
 {
-    struct mmcontext *context;
+    //struct mmcontext *context;
     struct task_struct *task = current;
     struct vm_area_struct *vma;
     unsigned long vaddr;
     int i;
-
-    // Save program state
     if (msg[0] == '0') {
-		
-		printk(KERN_INFO "Saving Process Context\n");
         // Allocate a new mmcontext structure to hold the program state
         context = kmalloc(sizeof(struct mmcontext), GFP_KERNEL);
         if (!context) {
             return -ENOMEM;
         }
-
         // Loop through all memory mappings in the process
         for (vma = task->mm->mmap; vma; vma = vma->vm_next) {
-			printk(KERN_INFO "VMA Traversing\n");
             // Ignore memory mappings that are not anonymous or that are not readable/writable
-            if (!(vma->vm_flags & VM_READ) || !(vma->vm_flags & VM_WRITE) || vma->vm_file) {
+            if (!(vma->vm_flags & VM_READ) || !(vma->vm_flags & VM_WRITE) || vma->vm_file || (vma->vm_flags & VM_STACK)) {
                 continue;
-            }
-
+			}
             // Loop through all pages in the memory mapping
             for (vaddr = vma->vm_start; vaddr < vma->vm_end; vaddr += PAGE_SIZE) {
-				
                 struct page *page = follow_page(vma, vaddr, FOLL_GET);
-				printk(KERN_INFO "Looping all pages\n");
                 if (!page) {
-					
-                    kfree(context);
-					printk(KERN_INFO "Page not found\n");
 					continue;
                     //return -EFAULT;
                 }
-
-                // Copy the page contents to the mmcontext structure
-				printk(KERN_INFO "Copy Page context to mmcontext\n");
                 memcpy(context->pages[context->num_pages].data, kmap(page), PAGE_SIZE);
                 context->pages[context->num_pages].addr = vaddr;
                 context->num_pages++;
-
                 kunmap(page);
                 put_page(page);
-				printk(KERN_INFO "End of loop\n");
             }
-			printk(KERN_INFO "VMA Traversing End\n");
         }
-		printk(KERN_INFO "Loop exited\n");
-        // Save the mmcontext pointer in the task_struct
         task->mmcontext = context;
-		printk(KERN_INFO "System call exited\n");
-
-		
-        for (i = 0; i < context->num_pages; i++) {
-            printk(KERN_INFO "Page address: %lx\n", context->pages[i].addr);
-            printk(KERN_INFO "Page contents: %s\n", context->pages[i].data);
-        }
-
-    }
-
+	}
     // Restore program state
     else if (msg[0] == '1') {
-        // Retrieve the saved mmcontext pointer from the task_struct
+        if (!context) {
+            return -EFAULT;
+        }
+        // Loop through all pages in the saved mmcontext structure
+        for (i = 0; i < context->num_pages; i++) {
+            vaddr = context->pages[i].addr;
+            vma = find_vma(task->mm, vaddr);
+            if (!vma || vma->vm_start > vaddr || vma->vm_end < vaddr + PAGE_SIZE) {
+				continue;
+            }
+            if (!(vma->vm_flags & VM_WRITE)) {
+                //printk(KERN_ERR "Memory mapping is not writable for page at address %lx\n", vaddr);
+                return -EFAULT;
+            }
+            // Copy the saved page contents back into the process
+            memcpy(kmap(virt_to_page(vaddr)), context->pages[i].data, PAGE_SIZE);
+            kunmap(virt_to_page(vaddr));
+        }
+		 kfree(context);
+		 task->mmcontext = NULL;
     }
-
     // Invalid argument
     else {
         return -EINVAL;
     }
-
     return 0;
 }
 
